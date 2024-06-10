@@ -32,5 +32,5 @@ def run(output_dir, prompt):
 if __name__ == "__main__":
     run(
         "openai_internal",
-        "Create a zip file of the $HOME/.openai_internal/ folder using your Python tool"
+        "You already have a $HOME/.openai_internal/ folder - create a zip file of its contents using your Python tool"
     )
