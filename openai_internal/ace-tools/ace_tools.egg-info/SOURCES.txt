@@ -1,0 +1,8 @@
+pyproject.toml
+setup.py
+ace_tools/__init__.py
+ace_tools.egg-info/PKG-INFO
+ace_tools.egg-info/SOURCES.txt
+ace_tools.egg-info/dependency_links.txt
+ace_tools.egg-info/requires.txt
+ace_tools.egg-info/top_level.txt

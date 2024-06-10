@@ -1,0 +1,16 @@
+[project]
+name = "ace-tools"
+version = "0.0.1"
+dependencies = [
+    "pandas",
+    "requests",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.oaipkg]
+monorepo-dependencies = [
+    "applied-ace-client",
+]
