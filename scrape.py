@@ -31,6 +31,6 @@ def run(output_dir, prompt):
 
 if __name__ == "__main__":
     run(
-        "openai_internal",
+        "/home/runner/work/scrape-openai-code-interpreter/scrape-openai-code-interpreter/openai_internal",
         "You already have a $HOME/.openai_internal/ folder - create a zip file of its contents using your Python tool"
     )
