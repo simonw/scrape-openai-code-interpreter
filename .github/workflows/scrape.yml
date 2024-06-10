@@ -20,6 +20,8 @@ jobs:
         cache: 'pip'
     - run: pip install -r requirements.txt
     - name: Fetch latest data
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
         rm -rf openai_internal || true
         python scrape.py
