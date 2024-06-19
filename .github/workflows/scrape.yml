@@ -24,7 +24,8 @@ jobs:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
         rm -rf openai_internal || true
-        python scrape.py
+        rm -rf packages.txt || true
+        python scrape.py /home/runner/work/scrape-openai-code-interpreter/scrape-openai-code-interpreter/
     - name: Commit and push if it changed
       run: |-
         git config user.name "Automated"
