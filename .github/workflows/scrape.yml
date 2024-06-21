@@ -26,6 +26,8 @@ jobs:
         rm -rf openai_internal || true
         rm -rf packages.txt || true
         python scrape.py /home/runner/work/scrape-openai-code-interpreter/scrape-openai-code-interpreter/
+        # Sort packages.txt alphabetically
+        cat packages.txt | sort > packages.tmp && mv packages.tmp packages.txt
     - name: Commit and push if it changed
       run: |-
         git config user.name "Automated"
