@@ -34,7 +34,7 @@ class MethodCallException(pydantic.BaseModel):
 class MethodCallReturnValue(pydantic.BaseModel):
     message_type: Literal["call_return_value"] = "call_return_value"
     request_id: str
-    value: Any
+    value: Any = None
 
 
 class MethodCallObjectReferenceReturnValue(pydantic.BaseModel):
@@ -114,8 +114,8 @@ class UserMachineResponseTooLarge(AceException):
 
 
 def parse_raw_as_user_machine_request(s: str | bytes) -> UserMachineRequest:
-    return pydantic.parse_raw_as(UserMachineRequest, s)                
+    return pydantic.TypeAdapter(UserMachineRequest).validate_json(s)                
 
 
 def parse_raw_as_user_machine_response(s: str | bytes) -> UserMachineResponse:
-    return pydantic.parse_raw_as(UserMachineResponse, s)                
+    return pydantic.TypeAdapter(UserMachineResponse).validate_json(s)                

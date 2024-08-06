@@ -20,14 +20,14 @@ class SerializedException(BaseModel):
 class LogExceptionRequest(BaseModel):
     message: str
     exception: SerializedException
-    orig_func_name: str | None
-    orig_func_args: str | None
-    orig_func_kwargs: str | None
+    orig_func_name: str | None = None
+    orig_func_args: str | None = None
+    orig_func_kwargs: str | None = None
 
 
 class LogMatplotlibFallbackRequest(BaseModel):
     reason: str
-    metadata: dict[str, Any] | None
+    metadata: dict[str, Any] | None = None
 
 
 def get_api_router(send_callback: Callable[[MethodCall, Request], JSONResponse]):

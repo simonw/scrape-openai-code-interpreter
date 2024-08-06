@@ -115,7 +115,7 @@ def parse_io_pub_message(message_json: dict[str, Any]) -> IOPubMessage:
         case _:
             raise ValueError(f"Unknown message type: {message_json['msg_type']}")
 
-    return cast(IOPubMessage, pydantic.parse_obj_as(model, message_json))
+    return cast(IOPubMessage, pydantic.TypeAdapter(model).validate_python(message_json))
 
 
 JupyterMessage = JupyterStartMessage | JupyterTimeoutMessage | IOPubMessage

@@ -36,7 +36,7 @@ def _call_function(
             method=function_name,
             args=list(function_args),
             kwargs=function_kwargs,
-        ).dict(),
+        ).model_dump(),
     )
 
     if response.status_code == 200:

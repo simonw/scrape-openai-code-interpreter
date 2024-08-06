@@ -23,7 +23,7 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from jupyter_client import AsyncKernelClient, AsyncKernelManager, AsyncMultiKernelManager
-from pydantic import parse_obj_as
+from pydantic import TypeAdapter
 
 from applied_ace_client.ace_types.user_machine_types import (
     CheckFileResponse,
@@ -256,7 +256,7 @@ async def _forward_callback_from_kernel(call: MethodCall, request: Request):
             detail=f"There are multiple websocket connections associated with callback id {call.object_reference.id}",
         )
 
-    await next(iter(conn)).send_text(call.json())
+    await next(iter(conn)).send_text(call.model_dump_json())
 
     try:
         response = await _response_to_callback_from_kernel_futures[call.request_id]
@@ -377,7 +377,7 @@ async def self_identify():
 @app.post("/upload")
 async def upload(upload_request: str = Form(), file: UploadFile = File()):
     logger.info("Upload request")
-    request = parse_obj_as(UploadFileRequest, json.loads(upload_request))
+    request = TypeAdapter(UploadFileRequest).validate_python(json.loads(upload_request))
     try:
         total_size = 0
         with open(request.destination, "wb") as f:
@@ -497,7 +497,9 @@ async def channel(websocket: WebSocket):
             if recv_from_api_server in done:
                 done_future = recv_from_api_server
                 recv_from_api_server = asyncio.create_task(websocket.receive_text())
-                request = parse_obj_as(UserMachineRequest, json.loads(done_future.result()))
+                request = TypeAdapter(UserMachineRequest).validate_python(
+                    json.loads(done_future.result())
+                )
                 logger.debug(f"Received message from API server. {request}")
                 if isinstance(request, RegisterActivityRequest):
                     logger.debug(f"Registering activity. {request}")
@@ -590,7 +592,7 @@ async def channel(websocket: WebSocket):
                     del e
 
                                            
-                message = result.json()
+                message = result.model_dump_json()
                 logger.debug(f"Sending response: {type(result)}, {len(message)}")
                 if len(message) > _MAX_JUPYTER_MESSAGE_SIZE:
                     logger.error(f"Response too large: {len(message)}")
@@ -602,7 +604,7 @@ async def channel(websocket: WebSocket):
                         type=type(e).__name__,
                         value=str(e),
                         traceback=traceback.format_tb(e.__traceback__),
-                    ).json()
+                    ).model_dump_json()
 
                 await websocket.send_text(message)
                 logger.debug("Response sent.")

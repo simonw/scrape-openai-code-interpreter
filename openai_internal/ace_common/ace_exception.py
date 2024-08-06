@@ -14,6 +14,10 @@ class AceInternalException(AceException):
     pass
 
 
+class AceTimeoutException(AceConnectionException):
+    pass
+
+
 class AceTooManyRequestsException(AceException):
     pass
 

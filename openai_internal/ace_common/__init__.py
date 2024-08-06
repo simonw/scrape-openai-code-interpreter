@@ -4,6 +4,7 @@ from .ace_exception import (
     AceFileNotFoundException,
     AceInternalException,
     AceResourceNotFoundException,
+    AceTimeoutException,
     AceTooManyRequestsException,
     AsyncioCancelledError,
     CodeExecutorTimeoutError,
