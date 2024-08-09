@@ -7,6 +7,7 @@ import time
 import traceback
 import urllib.parse
 import uuid
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import traitlets
@@ -41,7 +42,7 @@ from applied_ace_client.ace_types.user_machine_types import (
     UserMachineResponseTooLarge,
 )
 
-from . import logger_utils, routes, run_jupyter
+from . import health_check, logger_utils, routes
 
 logger_utils.init_logger_settings()
 logger = logging.getLogger(__name__)
@@ -62,11 +63,23 @@ _DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 _MAX_JUPYTER_MESSAGE_SIZE = 10 * 1024 * 1024
 _MAX_KERNELS = 20
 
-app = FastAPI()
 
-_timeout_task = None
-_fill_kernel_queue_task = None
-_health_check_task = None
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+                             
+    timeout_task = asyncio.create_task(_kill_old_kernels())
+    fill_kernel_queue_task = asyncio.create_task(_fill_kernel_queue())
+    health_check_task = asyncio.create_task(HEALTH_CHECK_JOB.run())
+
+    yield
+
+                             
+    timeout_task.cancel()
+    fill_kernel_queue_task.cancel()
+    health_check_task.cancel()
+
+
+app = FastAPI(lifespan=lifespan)
 
 jupyter_config = traitlets.config.get_config()
                                                                       
@@ -86,22 +99,35 @@ _kernel_callback_id = {}
 _kernel_queue = None
 _first_kernel_started = False
 
-_SELF_IDENTIFY_HEADER_KEY = "x-ace-self-identify"
-_SELF_IDENTIFY_HEADER_KEY_BYTES = b"x-ace-self-identify"
-_SELF_IDENTIFY_STR = os.getenv("ACE_SELF_IDENTIFY")
-_SELF_IDENTIFY_BYTES = os.getenv("ACE_SELF_IDENTIFY").encode("utf-8")
+HEALTH_CHECK_JOB = health_check.HealthCheckBackgroundJob(
+    logger=logger, kernel_manager=_MULTI_KERNEL_MANAGER
+)
 
-                                                                                           
-                                                                                                 
-                                             
-_last_successful_health_check_monotonic_time = None
-_health_check_error = None
+
+@dataclass(frozen=True, kw_only=True)
+class SelfIdentify:
+    value: str
+
+    def to_header(self) -> dict[str, str]:
+        return {"x-ace-self-identify": self.value}
+
+    def to_websocket_header(self) -> tuple[bytes, bytes]:
+        return b"x-ace-self-identify", self.value.encode("utf-8")
+
+    @classmethod
+    def from_env(cls) -> "SelfIdentify":
+        self_id = os.getenv("ACE_SELF_IDENTIFY")
+        if self_id is None:
+            raise ValueError("ACE_SELF_IDENTIFY is not set")
+        if not self_id.strip():
+            raise ValueError("ACE_SELF_IDENTIFY is empty")
+
+        return cls(value=self_id)
+
+
+_SELF_IDENTIFY = SelfIdentify.from_env()
+
 _fill_kernel_queue_task_error = None
-                                                                                             
-_HEALTH_CHECK_DELAY = 300
-                                                                                               
-                       
-_HEALTH_CHECK_FAILURE_THRESHOLD = 600
 
                                             
 _KERNEL_CALLBACK_CONNECTION: dict[str, set[WebSocket]] = {}
@@ -153,10 +179,9 @@ async def _fill_kernel_queue():
             logger.info("Create new kernel for pool: Preparing")
             if len(_timeout_at.keys()) >= _MAX_KERNELS:
                 logger.info(f"Too many kernels ({_MAX_KERNELS}). Deleting oldest kernel.")
-                sort_key = lambda kernel_id: _timeout_at[kernel_id]
-                kernels_to_delete = sorted(_timeout_at.keys(), key=sort_key, reverse=True)[
-                    _MAX_KERNELS - 1 :
-                ]
+                kernels_to_delete = sorted(
+                    _timeout_at.keys(), key=lambda kernel_id: _timeout_at[kernel_id], reverse=True
+                )[_MAX_KERNELS - 1 :]
                 for kernel_id in kernels_to_delete:
                     logger.info(f"Deleting kernel {kernel_id}")
                     await _delete_kernel(kernel_id)
@@ -215,21 +240,9 @@ async def _delete_kernel(kernel_id):
     del _kernel_callback_id[kernel_id]
 
 
-@app.on_event("startup")
-async def startup():
-    global _timeout_task, _fill_kernel_queue_task, _health_check_task
-    _timeout_task = asyncio.create_task(_kill_old_kernels())
-    _fill_kernel_queue_task = asyncio.create_task(_fill_kernel_queue())
-    _health_check_task = asyncio.create_task(_health_check_background())
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    _timeout_task.cancel()                
-    _fill_kernel_queue_task.cancel()                
-
-
 def _is_from_localhost(request: Request) -> bool:
+    if request.client is None:
+        return False
     return request.client.host == "127.0.0.1"
 
 
@@ -297,53 +310,24 @@ async def check_startup():
     return _check_health()
 
 
-async def _health_check_background():
-    global _last_successful_health_check_monotonic_time, _health_check_error
-    code = "print(f'{400+56}'); 100+23"
-    while True:
-        logger.debug("Health check: running...")
-        start_time = time.monotonic()
-        try:
-            kernel_id = await _MULTI_KERNEL_MANAGER.start_kernel()
-            km = _MULTI_KERNEL_MANAGER.get_kernel(kernel_id)
-            assert isinstance(km, AsyncKernelManager)
-            try:
-                result = await run_jupyter.async_run_code(km, code, shutdown_kernel=False)
-                execute_result, error_stacktrace, stream_text = result
-                if error_stacktrace is not None:
-                    logger.info(
-                        f"Health check: code execution got unexpected error:\n{error_stacktrace}"
-                    )
-                    _health_check_error = error_stacktrace
-                elif execute_result != {"text/plain": "123"} or stream_text != "456\n":
-                    s = f"Health check: code execution got unexpected result: [{execute_result}] [{stream_text}]"
-                    logger.info(s)
-                    _health_check_error = s
-            finally:
-                await _MULTI_KERNEL_MANAGER.shutdown_kernel(kernel_id)
-            end_time = time.monotonic()
-            logger.debug(f"Health check: completed successfully in {end_time - start_time} seconds")
-            _last_successful_health_check_monotonic_time = time.monotonic()
-            _health_check_error = None
-        except:
-            _health_check_error = traceback.format_exc()
-            logger.error(f"Health check: encountered error:\n{_health_check_error}")
-        await asyncio.sleep(_HEALTH_CHECK_DELAY)
-
-
 def _check_health():
                                                                                    
                                   
+     
                                                                               
                                                                        
+     
                                                                               
+     
                                                                                          
                                                                                            
                                                                                        
                                                                                          
+
     if not _first_kernel_started:
         logger.info("Reporting health check failure: kernel queue is not initialized")
         return PlainTextResponse(content="Kernel queue is not initialized", status_code=500)
+
     if _fill_kernel_queue_task_error is not None:
         logger.info(
             "Reporting health check failure: _fill_kernel_queue task failed due to unexpected error"
@@ -352,20 +336,20 @@ def _check_health():
             content="_fill_kernel_queue task failed due to unexpected error:\n{_fill_kernel_queue_task_error}",
             status_code=500,
         )
-    if _health_check_error != None:
-        reason = f"Most recent health_check reported error: {_health_check_error}"
+
+    if HEALTH_CHECK_JOB.last_error is not None:
+        reason = f"Most recent health_check reported error: {HEALTH_CHECK_JOB.last_error}"
         logger.error(f"Reporting health check failure: {reason}")
         return PlainTextResponse(content=reason, status_code=500)
-    if _last_successful_health_check_monotonic_time is None:
-        last_success_age = None
-    else:
-        last_success_age = time.monotonic() - _last_successful_health_check_monotonic_time
-    if last_success_age is None or last_success_age > _HEALTH_CHECK_FAILURE_THRESHOLD:
-        reason = f"Most recent successful health check is {last_success_age} seconds old"
-        if last_success_age is not None:
+
+    if HEALTH_CHECK_JOB.is_stale():
+        reason = "Most recent successful health check is too old"
+        if HEALTH_CHECK_JOB.last_success_at is not None:
+            reason = f"Most recent successful health check is {time.monotonic() - HEALTH_CHECK_JOB.last_success_at} seconds old"
                                                                
             logger.error(f"Reporting health check failure: {reason}")
         return PlainTextResponse(content=reason, status_code=500)
+
     return PlainTextResponse(content="success")
 
 
@@ -472,7 +456,7 @@ async def create_kernel(create_kernel_request: CreateKernelRequest):
                                                                         
 @app.websocket("/channel")
 async def channel(websocket: WebSocket):
-    await websocket.accept(headers=[(_SELF_IDENTIFY_HEADER_KEY_BYTES, _SELF_IDENTIFY_BYTES)])
+    await websocket.accept(headers=[_SELF_IDENTIFY.to_websocket_header()])
 
     clients: dict[str, AsyncKernelClientHolder] = {}
     registered_callback_ids = set()
@@ -616,10 +600,11 @@ async def channel(websocket: WebSocket):
     finally:
         try:
             for client in clients.values():
-                client.value.stop_channels()
-                client.value = None
+                if client.value is not None:
+                    client.value.stop_channels()
+                    client.value = None
             logger.debug("All client channels stopped.")
-        except:
+        except Exception:
             logger.exception("Error while stopping client channels.")
 
         for callback_id in registered_callback_ids:
@@ -649,7 +634,8 @@ async def add_self_identify_header(request: Request, call_next):
         return PlainTextResponse(
             "Internal server error",
             status_code=500,
-            headers={_SELF_IDENTIFY_HEADER_KEY: _SELF_IDENTIFY_STR},
+            headers=_SELF_IDENTIFY.to_header(),
         )
-    response.headers[_SELF_IDENTIFY_HEADER_KEY] = _SELF_IDENTIFY_STR
+    for header, value in _SELF_IDENTIFY.to_header().items():
+        response.headers[header] = value
     return response

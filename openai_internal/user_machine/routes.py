@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, Coroutine
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -30,7 +30,9 @@ class LogMatplotlibFallbackRequest(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
-def get_api_router(send_callback: Callable[[MethodCall, Request], JSONResponse]):
+def get_api_router(
+    send_callback: Callable[[MethodCall, Request], Coroutine[Any, Any, JSONResponse]]
+):
     api_router = APIRouter()
 
     @api_router.post("/ace_tools/call_function")
