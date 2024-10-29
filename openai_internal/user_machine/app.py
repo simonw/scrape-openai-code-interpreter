@@ -415,7 +415,7 @@ async def download(path: str):
 @app.get("/check_file/{path:path}")
 async def check_file(path: str):
     path = "/" + urllib.parse.unquote(path)
-    logger.info(f"Check file request. {path}")
+    logger.info("Check file request")
     exists = os.path.isfile(path)
     size = os.path.getsize(path) if exists else 0
     return CheckFileResponse(exists=exists, size=size, too_large=False)
