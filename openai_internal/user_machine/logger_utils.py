@@ -5,6 +5,8 @@ from typing import Any
 
 from pythonjsonlogger import jsonlogger
 
+from applied_ace_common.logger_utils import redact_query_params
+
 PLAINTEXT_LOG_FORMAT = "[%(asctime)s.%(msecs)03d] [%(levelname)s] [%(name)s] %(message)s"
 
 
@@ -43,3 +45,8 @@ def init_logger_settings(
     for handler in root_logger.handlers:
         root_logger.removeHandler(handler)
     root_logger.addHandler(base_handler)
+
+    uvicorn_error = logging.getLogger("uvicorn.error")
+    uvicorn_access = logging.getLogger("uvicorn.access")
+
+    redact_query_params([uvicorn_error, uvicorn_access, root_logger])

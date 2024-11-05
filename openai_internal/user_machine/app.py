@@ -367,7 +367,9 @@ async def self_identify():
 
 
 @app.post("/upload")
-async def upload(upload_request: str = Form(), file: UploadFile = File()):
+async def upload(
+    upload_request: str = Form(), file: UploadFile = File(), should_log_path: bool = True
+):
     logger.info("Upload request")
     request = TypeAdapter(UploadFileRequest).validate_python(json.loads(upload_request))
     try:
@@ -385,39 +387,68 @@ async def upload(upload_request: str = Form(), file: UploadFile = File()):
         try:
             os.remove(request.destination)
         except Exception as e:
-            logger.exception(f"Error while removing file: {request.destination}", exc_info=e)
+            if should_log_path:
+                msg = f"Error while removing file: {request.destination}"
+            else:
+                msg = "Error while removing file"
+
+            logger.exception(msg, exc_info=e)
         raise
 
-    logger.info(f"Upload request complete. {upload_request}")
+    if should_log_path:
+        logger.info(f"Upload request complete. {upload_request}")
+
     return JSONResponse(content={})
 
 
+@app.get("/download")
 @app.get("/download/{path:path}")
-async def download(path: str):
-    path = urllib.parse.unquote(path)
-    if not os.path.isfile(path):
-        raise HTTPException(404, f"File not found: {path}")
+async def download(
+    path: str | None = None, file_path: str | None = None, should_log_path: bool = True
+) -> StreamingResponse:
+                                                                                     
+                                                                                                            
+    final_path = path if path else file_path
+    if not final_path:
+        raise HTTPException(status_code=400, detail="Path not specified.")
 
-    logger.info(f"Download request. {path}")
+    final_path = urllib.parse.unquote(final_path)
+    if not os.path.isfile(final_path):
+        raise HTTPException(404, f"File not found: {final_path}")
+
+    if should_log_path:
+        logger.info(f"Download request. {final_path}")
 
     def iterfile():
-        with open(path, "rb") as f:
+        with open(final_path, "rb") as f:
             while chunk := f.read(_DOWNLOAD_CHUNK_SIZE):
                 yield chunk
 
     return StreamingResponse(
         iterfile(),
-        headers={"Content-Length": f"{os.path.getsize(path)}"},
+        headers={"Content-Length": f"{os.path.getsize(final_path)}"},
         media_type="application/octet-stream",
     )
 
 
+@app.get("/check_file")
 @app.get("/check_file/{path:path}")
-async def check_file(path: str):
-    path = "/" + urllib.parse.unquote(path)
-    logger.info("Check file request")
-    exists = os.path.isfile(path)
-    size = os.path.getsize(path) if exists else 0
+async def check_file(
+    path: str | None = None, file_path: str | None = None, should_log_path: bool = True
+):
+                                                                                     
+                                                                                                            
+    final_path = path if path else file_path
+    if not final_path:
+        raise HTTPException(status_code=400, detail="Path not specified.")
+
+    final_path = "/" + urllib.parse.unquote(final_path)
+
+    if should_log_path:
+        logger.info(f"Check file request. {final_path}")
+
+    exists = os.path.isfile(final_path)
+    size = os.path.getsize(final_path) if exists else 0
     return CheckFileResponse(exists=exists, size=size, too_large=False)
 
 
