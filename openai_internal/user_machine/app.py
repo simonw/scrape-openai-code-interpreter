@@ -636,6 +636,7 @@ async def channel(websocket: WebSocket):
             logger.debug("Client WebSocket connection closed normally")
         else:
             logger.exception(f"Client WebSocket connection closed with code {e.code}")
+        recv_from_api_server.cancel()
     finally:
         try:
             for client in clients.values():
