@@ -1,4 +1,4 @@
-load("//project/bazel/rules:python.bzl", "oai_py_library", "pip")
+load("//project/bazel/rules:python.bzl", "oai_py_library")
 
 oai_py_library(
     name = "ace_tools",
@@ -8,7 +8,9 @@ oai_py_library(
     ],
     deps = [
         "//project/ace/applied/applied-ace-client:applied_ace_client",
-    ] + pip("pandas") + pip("requests"),
+        "@pypi//pandas:pkg",
+        "@pypi//requests:pkg",
+    ],
     data = [
         "@applied_encodings//:encodings_dir",
     ],
