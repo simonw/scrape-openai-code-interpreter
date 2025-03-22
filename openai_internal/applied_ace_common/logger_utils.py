@@ -5,7 +5,7 @@ import re
 class AccessLogQueryParamRemover(logging.Formatter):
     query_param_pattern = re.compile(r"\?[^ ]*")
 
-    def __init__(self, fmt=None, wrapped_formatter=None):
+    def __init__(self, fmt=None, wrapped_formatter=None) -> None:
         if wrapped_formatter is None and fmt is None:
             raise ValueError("Either wrapped_formatter or fmt must be provided")
 
@@ -20,7 +20,7 @@ class AccessLogQueryParamRemover(logging.Formatter):
         return message
 
 
-def redact_query_params(loggers: list[logging.Logger]):
+def redact_query_params(loggers: list[logging.Logger]) -> None:
     for logger in loggers:
         for handler in logger.handlers:
             handler.setFormatter(AccessLogQueryParamRemover(wrapped_formatter=handler.formatter))

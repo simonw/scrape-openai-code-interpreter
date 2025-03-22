@@ -38,12 +38,12 @@ async def async_run_code(
             loop = asyncio.get_running_loop()
             dead_fut = loop.create_future()
 
-            def restarting():
-                assert (
-                    False
-                ), "Restart shouldn't happen because config.KernelRestarter.restart_limit is expected to be set to 0"
+            def restarting() -> None:
+                assert False, (
+                    "Restart shouldn't happen because config.KernelRestarter.restart_limit is expected to be set to 0"
+                )
 
-            def dead():
+            def dead() -> None:
                 logger.info("Kernel has died, will NOT restart")
                 dead_fut.set_result(None)
 
@@ -63,7 +63,7 @@ async def async_run_code(
                 km.remove_restart_callback(restarting, "restart")
                 km.remove_restart_callback(dead, "dead")
 
-        async def send_interrupt():
+        async def send_interrupt() -> None:
             await asyncio.sleep(interrupt_after)
             logger.info("Sending interrupt to kernel")
             await km.interrupt_kernel()

@@ -47,7 +47,7 @@ from . import health_check, logger_utils, routes
 logger_utils.init_logger_settings()
 logger = logging.getLogger(__name__)
 
-if os.getenv("ENVIRONMENT") in ("development", "staging"):
+if os.getenv("ENVIRONMENT") in {"development", "staging"}:
                                                            
                                                                            
     logger.info(f"Setting log level to DEBUG for environment: {os.getenv('ENVIRONMENT')}")
@@ -153,7 +153,7 @@ class AsyncKernelClientHolder:
 
 
                                                                                          
-async def _kill_old_kernels():
+async def _kill_old_kernels() -> None:
     while True:
         await asyncio.sleep(2.0)
         for kernel_id in list(_timeout_at.keys()):
@@ -164,7 +164,7 @@ async def _kill_old_kernels():
                 await _delete_kernel(kernel_id)
 
 
-async def _fill_kernel_queue():
+async def _fill_kernel_queue() -> None:
     global _first_kernel_started, _kernel_queue, _fill_kernel_queue_task_error
     try:
                                                                          
@@ -229,7 +229,7 @@ async def _fill_kernel_queue():
         raise
 
 
-async def _delete_kernel(kernel_id):
+async def _delete_kernel(kernel_id) -> None:
     kernel_ids = _MULTI_KERNEL_MANAGER.list_kernel_ids()
     if kernel_id in kernel_ids:
         kernel_manager = _MULTI_KERNEL_MANAGER.get_kernel(str(kernel_id))
@@ -296,12 +296,12 @@ async def _forward_callback_from_kernel(call: MethodCall, request: Request):
 app.include_router(routes.get_api_router(_forward_callback_from_kernel), prefix="")
 
 
-def _respond_to_callback_from_kernel(response: MethodCallReturnValue):
+def _respond_to_callback_from_kernel(response: MethodCallReturnValue) -> None:
     logger.info("Received callback response.")
     _response_to_callback_from_kernel_futures[response.request_id].set_result(response.value)
 
 
-def _respond_to_callback_exception_from_kernel(response: MethodCallException):
+def _respond_to_callback_exception_from_kernel(response: MethodCallException) -> None:
     logger.info("Received callback exception.")
     _response_to_callback_from_kernel_futures[response.request_id].set_exception(
         ToolCallbackError(response.value)
@@ -494,7 +494,7 @@ async def create_kernel(create_kernel_request: CreateKernelRequest):
 
                                                                         
 @app.websocket("/channel")
-async def channel(websocket: WebSocket):
+async def channel(websocket: WebSocket) -> None:
     await websocket.accept(headers=[_SELF_IDENTIFY.to_websocket_header()])
 
     clients: dict[str, AsyncKernelClientHolder] = {}

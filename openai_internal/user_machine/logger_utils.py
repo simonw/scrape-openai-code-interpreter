@@ -28,7 +28,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
 def init_logger_settings(
     root_log_level: int | str = logging.INFO,
     force_text_formatter: bool = False,
-):
+) -> None:
     env = os.getenv("ENVIRONMENT")
     base_handler = logging.StreamHandler()
 

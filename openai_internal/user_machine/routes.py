@@ -31,7 +31,7 @@ class LogMatplotlibFallbackRequest(BaseModel):
 
 
 def get_api_router(
-    send_callback: Callable[[MethodCall, Request], Coroutine[Any, Any, JSONResponse]]
+    send_callback: Callable[[MethodCall, Request], Coroutine[Any, Any, JSONResponse]],
 ):
     api_router = APIRouter()
 
@@ -42,7 +42,7 @@ def get_api_router(
         return await send_callback(call, request)
 
     @api_router.post("/ace_tools/log_exception")
-    async def log_exception(body: LogExceptionRequest, request: Request):
+    async def log_exception(body: LogExceptionRequest, request: Request) -> None:
         logger.error(
             f"ace_tools exception logger: {body.message}, id={body.exception.id}, orig_func_name={body.orig_func_name}, type={body.exception.type}, value={body.exception.value}",
             extra={
@@ -59,7 +59,9 @@ def get_api_router(
                                          
 
     @api_router.post("/ace_tools/log_matplotlib_img_fallback")
-    async def log_matplotlib_img_fallback(body: LogMatplotlibFallbackRequest, request: Request):
+    async def log_matplotlib_img_fallback(
+        body: LogMatplotlibFallbackRequest, request: Request
+    ) -> None:
         logger.warning(
             f"ace_tools matplotlib img fallback: reason={body.reason} metadata={body.metadata}",
             extra={

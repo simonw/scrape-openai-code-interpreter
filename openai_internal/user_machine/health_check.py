@@ -32,7 +32,7 @@ class HealthCheckBackgroundJob:
         code: str | None = None,
         logger: logging.Logger,
         kernel_manager: AsyncMultiKernelManager,
-    ):
+    ) -> None:
         self.last_success_at = None
         self.last_error = None
         if code is not None:
