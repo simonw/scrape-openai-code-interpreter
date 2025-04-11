@@ -1,5 +1,0 @@
-Metadata-Version: 2.4
-Name: ace-tools
-Version: 0.0.1
-Requires-Dist: pandas
-Requires-Dist: requests
